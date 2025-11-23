@@ -129,28 +129,23 @@
         canvas.height = window.innerHeight;
 
         // --- TEARY OBJECT ---
+        // Load the image
+        const tearyImg = new Image();
+        tearyImg.src = 'teary.png'; 
+
+        // --- TEARY OBJECT ---
         const teary = {
             x: 50,
             y: 150,
-            width: 30,
-            height: 30,
-            gravity: 0.25, // Gravity pull
-            lift: -6,      // Jump strength
+            width: 40,  // Slightly larger for the image
+            height: 40,
+            gravity: 0.25,
+            lift: -6,
             velocity: 0,
             
             draw: function() {
-                ctx.fillStyle = '#00bfff'; // Teardrop Blue color
-                
-                // Draw a teardrop shape (or replace with ctx.drawImage if you have sprite)
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.closePath();
-                
-                // Add eyes (Teary look)
-                ctx.fillStyle = 'white';
-                ctx.fillRect(this.x - 5, this.y - 5, 4, 4);
-                ctx.fillRect(this.x + 2, this.y - 5, 4, 4);
+                // Draw the image instead of the blue circle
+                ctx.drawImage(tearyImg, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
             },
             
             update: function() {
@@ -174,7 +169,6 @@
                 this.velocity = this.lift;
             }
         };
-
         // --- OBSTACLES (Red Candles) ---
         const obstacles = {
             list: [],
