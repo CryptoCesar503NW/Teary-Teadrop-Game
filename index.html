@@ -112,7 +112,7 @@
         
         <div id="start-screen">
             <h1>Teary<br>Teardrop</h1>
-            <p>Tap to Keep Teary Afloat!</p>
+            <p>Tap to help Teary avoid Rugs!</p>
             <button onclick="startGame()">Start Game</button>
         </div>
 
@@ -126,6 +126,7 @@
     <canvas id="gameCanvas"></canvas>
 
     <script>
+        // --- TELEGRAM SETUP ---
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
@@ -164,15 +165,12 @@
                 // 1. Draw The Teardrop Body
                 ctx.beginPath();
                 ctx.fillStyle = '#00bfff'; // Baby Blue
-                // Start at top point
                 ctx.moveTo(centerX, centerY - size * 1.5);
-                // Curve to bottom right
                 ctx.bezierCurveTo(
                     centerX + size, centerY - size * 0.5, 
                     centerX + size, centerY + size, 
                     centerX, centerY + size
                 );
-                // Curve to bottom left
                 ctx.bezierCurveTo(
                     centerX - size, centerY + size, 
                     centerX - size, centerY - size * 0.5, 
@@ -180,7 +178,7 @@
                 );
                 ctx.fill();
                 
-                // Add a lighter shine/gradient for 3D effect
+                // Shine effect
                 let grad = ctx.createRadialGradient(centerX - 5, centerY + 5, 2, centerX, centerY, size);
                 grad.addColorStop(0, '#4dd2ff');
                 grad.addColorStop(1, '#00bfff');
@@ -209,11 +207,43 @@
                 ctx.arc(centerX + 6, centerY + 2, 3, 0, Math.PI * 2);
                 ctx.fill();
 
-                // 4. Draw Shine in Eyes (Cute factor)
+                // 4. Draw Shine in Eyes
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
                 ctx.arc(centerX - 5, centerY, 1.5, 0, Math.PI * 2);
                 ctx.arc(centerX + 7, centerY, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 5. Draw Smile
+                ctx.beginPath();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'black';
+                ctx.arc(centerX, centerY + 6, 8, 0.2 * Math.PI, 0.8 * Math.PI);
+                ctx.stroke();
+
+                // 6. Draw Red Bowtie
+                ctx.fillStyle = '#ff4d4d'; 
+                const tieY = centerY + 16; 
+
+                // Left part of tie
+                ctx.beginPath();
+                ctx.moveTo(centerX, tieY);
+                ctx.lineTo(centerX - 10, tieY - 4);
+                ctx.lineTo(centerX - 10, tieY + 4);
+                ctx.closePath();
+                ctx.fill();
+
+                // Right part of tie
+                ctx.beginPath();
+                ctx.moveTo(centerX, tieY);
+                ctx.lineTo(centerX + 10, tieY - 4);
+                ctx.lineTo(centerX + 10, tieY + 4);
+                ctx.closePath();
+                ctx.fill();
+
+                // Center knot
+                ctx.beginPath();
+                ctx.arc(centerX, tieY, 2.5, 0, Math.PI * 2);
                 ctx.fill();
             },
             
@@ -241,7 +271,7 @@
         const obstacles = {
             list: [],
             width: 55,
-            gap: 180, 
+            gap: 190, 
             dx: 3, 
             
             draw: function() {
@@ -288,8 +318,7 @@
                     let p = this.list[i];
                     p.x -= this.dx;
                     
-                    // Collision
-                    // Simplified box collision for the teardrop
+                    // Collision (Simplified box)
                     if (teary.x + teary.width/3 > p.x && 
                         teary.x - teary.width/3 < p.x + this.width) {
                             if (teary.y - teary.height/3 < p.top || 
