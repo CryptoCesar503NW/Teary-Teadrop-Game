@@ -158,8 +158,10 @@
             y: 150,
             width: 40,  
             height: 40,
-            gravity: 0.25,
-            lift: -6,
+            
+            // --- PHYSICS UPDATES HERE ---
+            gravity: 0.5,  // Increased from 0.25 (Falls faster = feels less laggy)
+            lift: -7.5,    // Increased magnitude slightly to combat gravity, but net result is shorter jump
             velocity: 0,
             
             draw: function() {
@@ -228,8 +230,8 @@
         const obstacles = {
             list: [],
             width: 55,
-            gap: 190, 
-            dx: 3, 
+            gap: 200, // Slightly wider gap for faster gameplay
+            dx: 3.5,  // Speed increased slightly (from 3 to 3.5) for "snappy" feel
             
             draw: function() {
                 for(let i = 0; i < this.list.length; i++) {
@@ -252,7 +254,8 @@
             },
             
             update: function() {
-                if (frames % 110 === 0) {
+                // Spawn rate adjusted for speed
+                if (frames % 100 === 0) {
                     let maxTop = canvas.height - this.gap - 50;
                     let topHeight = Math.floor(Math.random() * (maxTop - 50)) + 50;
                     this.list.push({ x: canvas.width, top: topHeight, bottom: canvas.height - this.gap - topHeight, passed: false });
@@ -281,18 +284,16 @@
             }
         };
 
-        // --- INPUT HANDLING (CRITICAL FIX FOR MOBILE) ---
+        // --- INPUT HANDLING ---
         function handleInput(e) {
-            // CRITICAL FIX: If we touched a button, do NOT preventDefault.
-            // Let the browser handle the button click.
+            // Check if button click
             if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
                 return;
             }
 
             if(e.type === 'keydown' && e.code !== 'Space') return;
             
-            // Only prevent default if we are NOT clicking a button
-            // This prevents scrolling/zooming while playing
+            // Prevent default only on game canvas taps
             if(e.type === 'touchstart') {
                 e.preventDefault();
             }
@@ -303,7 +304,6 @@
         }
 
         window.addEventListener('keydown', handleInput);
-        // passive: false allows us to use preventDefault()
         window.addEventListener('touchstart', handleInput, {passive: false});
         window.addEventListener('mousedown', handleInput);
 
@@ -320,7 +320,6 @@
 
         // --- STATE ---
         function startGame() {
-            // Double check cleanup in case of multiple clicks
             if(gameRunning) return;
 
             document.getElementById('start-screen').classList.add('hidden');
