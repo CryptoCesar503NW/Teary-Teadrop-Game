@@ -22,7 +22,6 @@
             width: 100%;
             height: 100vh;
             background: linear-gradient(to bottom, #2c3e50, #000000);
-            image-rendering: -webkit-optimize-contrast; /* Helps with sharpness */
         }
 
         #ui-layer {
@@ -42,7 +41,7 @@
         #score-display {
             position: absolute;
             top: 50px;
-            font-size: 50px;
+            font-size: 60px;
             color: #ffffff;
             font-weight: bold;
             text-shadow: 2px 2px 4px #000;
@@ -50,13 +49,14 @@
         }
 
         #start-screen, #game-over-screen {
-            background: rgba(0, 0, 0, 0.85);
-            padding: 25px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
             border-radius: 20px;
             border: 3px solid #00bfff; 
             pointer-events: auto;
-            width: 80%; /* Width relative to phone screen */
+            width: 85%;
             max-width: 350px;
+            box-shadow: 0 0 20px rgba(0, 191, 255, 0.3);
         }
 
         .hidden {
@@ -64,40 +64,42 @@
         }
 
         h1 {
-            color: #ff4d4d; /* Red color for Rugged! */
-            margin: 0 0 10px 0;
-            font-size: 36px;
+            color: #ff4d4d;
+            margin: 0 0 15px 0;
+            font-size: 40px;
             text-transform: uppercase;
             text-shadow: 2px 2px #000;
+            font-weight: 900;
+            letter-spacing: 1px;
         }
 
         p {
             color: #fff;
             font-size: 18px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            line-height: 1.4;
         }
 
-        /* Updated Button Styling for Longer Text */
         button {
             background-color: #00bfff;
             color: white;
             border: none;
-            padding: 12px 20px; /* Adjusted padding */
-            font-size: 16px;    /* Slightly smaller font to fit the long text */
+            padding: 15px 20px;
+            font-size: 18px;
             border-radius: 50px;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,191,255,0.4);
+            box-shadow: 0 4px 15px rgba(0,191,255,0.5);
             font-weight: bold;
-            width: 100%;        /* Make button fill the container */
-            white-space: normal; /* Allow text to wrap if needed */
+            width: 100%;
+            white-space: normal;
             line-height: 1.2;
+            transition: transform 0.1s;
         }
 
         button:active {
             transform: scale(0.96);
         }
         
-        /* Specific style for start title */
         #start-screen h1 {
             color: #00bfff;
         }
@@ -131,10 +133,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // --- ASSETS ---
-        const tearyImg = new Image();
-        tearyImg.src = 'teary.png'; 
-
         // --- GAME VARIABLES ---
         let frames = 0;
         let score = 0;
@@ -148,27 +146,75 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- TEARY OBJECT ---
+        // --- TEARY OBJECT (Code-Drawn) ---
         const teary = {
             x: 50,
             y: 150,
-            width: 45,  
-            height: 45,
+            width: 40,  
+            height: 40,
             gravity: 0.25,
-            lift: -5.5,
+            lift: -6,
             velocity: 0,
             
             draw: function() {
-                if (tearyImg.complete && tearyImg.naturalHeight !== 0) {
-                    // Draw image
-                    ctx.drawImage(tearyImg, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
-                } else {
-                    // Fallback Circle (Blue)
-                    ctx.fillStyle = '#00bfff';
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                const centerX = this.x;
+                const centerY = this.y;
+                const size = this.width / 2;
+
+                // 1. Draw The Teardrop Body
+                ctx.beginPath();
+                ctx.fillStyle = '#00bfff'; // Baby Blue
+                // Start at top point
+                ctx.moveTo(centerX, centerY - size * 1.5);
+                // Curve to bottom right
+                ctx.bezierCurveTo(
+                    centerX + size, centerY - size * 0.5, 
+                    centerX + size, centerY + size, 
+                    centerX, centerY + size
+                );
+                // Curve to bottom left
+                ctx.bezierCurveTo(
+                    centerX - size, centerY + size, 
+                    centerX - size, centerY - size * 0.5, 
+                    centerX, centerY - size * 1.5
+                );
+                ctx.fill();
+                
+                // Add a lighter shine/gradient for 3D effect
+                let grad = ctx.createRadialGradient(centerX - 5, centerY + 5, 2, centerX, centerY, size);
+                grad.addColorStop(0, '#4dd2ff');
+                grad.addColorStop(1, '#00bfff');
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // 2. Draw Eyes
+                ctx.fillStyle = 'white';
+                // Left Eye
+                ctx.beginPath();
+                ctx.ellipse(centerX - 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Right Eye
+                ctx.beginPath();
+                ctx.ellipse(centerX + 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 3. Draw Pupils
+                ctx.fillStyle = 'black';
+                // Left Pupil
+                ctx.beginPath();
+                ctx.arc(centerX - 6, centerY + 2, 3, 0, Math.PI * 2);
+                ctx.fill();
+                // Right Pupil
+                ctx.beginPath();
+                ctx.arc(centerX + 6, centerY + 2, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 4. Draw Shine in Eyes (Cute factor)
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(centerX - 5, centerY, 1.5, 0, Math.PI * 2);
+                ctx.arc(centerX + 7, centerY, 1.5, 0, Math.PI * 2);
+                ctx.fill();
             },
             
             update: function() {
@@ -195,17 +241,17 @@
         const obstacles = {
             list: [],
             width: 55,
-            gap: 190, 
+            gap: 180, 
             dx: 3, 
             
             draw: function() {
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
                     
-                    // Top Candle (Red Gradient)
+                    // Top Candle
                     let gradTop = ctx.createLinearGradient(p.x, 0, p.x + this.width, 0);
                     gradTop.addColorStop(0, '#ff4d4d');
-                    gradTop.addColorStop(0.5, '#cc0000'); // Darker red center
+                    gradTop.addColorStop(0.5, '#cc0000');
                     gradTop.addColorStop(1, '#ff4d4d');
                     ctx.fillStyle = gradTop;
                     ctx.fillRect(p.x, 0, this.width, p.top);
@@ -243,10 +289,11 @@
                     p.x -= this.dx;
                     
                     // Collision
-                    if (teary.x + teary.width/2 > p.x && 
-                        teary.x - teary.width/2 < p.x + this.width) {
-                            if (teary.y - teary.height/2 < p.top || 
-                                teary.y + teary.height/2 > canvas.height - p.bottom) {
+                    // Simplified box collision for the teardrop
+                    if (teary.x + teary.width/3 > p.x && 
+                        teary.x - teary.width/3 < p.x + this.width) {
+                            if (teary.y - teary.height/3 < p.top || 
+                                teary.y + teary.height/3 > canvas.height - p.bottom) {
                                 gameOver();
                             }
                     }
