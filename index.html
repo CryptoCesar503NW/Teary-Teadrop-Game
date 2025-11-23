@@ -12,9 +12,10 @@
             background-color: #1a1a1a; 
             overflow: hidden;
             font-family: 'Arial', sans-serif;
-            touch-action: none; 
+            touch-action: none; /* Stops zooming/scrolling */
             user-select: none;
             -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent; /* Removes blue tap box on Android */
         }
 
         canvas {
@@ -30,7 +31,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
+            pointer-events: none; /* Lets clicks pass through to canvas... */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -48,15 +49,17 @@
             z-index: 10;
         }
 
+        /* POINTER EVENTS AUTO allows buttons inside the layer to be clicked */
         #start-screen, #game-over-screen {
             background: rgba(0, 0, 0, 0.9);
             padding: 30px;
             border-radius: 20px;
             border: 3px solid #00bfff; 
-            pointer-events: auto;
+            pointer-events: auto; 
             width: 85%;
             max-width: 350px;
             box-shadow: 0 0 20px rgba(0, 191, 255, 0.3);
+            z-index: 20;
         }
 
         .hidden {
@@ -84,7 +87,7 @@
             background-color: #00bfff;
             color: white;
             border: none;
-            padding: 15px 20px;
+            padding: 20px 30px; /* Larger hit area for mobile */
             font-size: 18px;
             border-radius: 50px;
             cursor: pointer;
@@ -94,10 +97,12 @@
             white-space: normal;
             line-height: 1.2;
             transition: transform 0.1s;
+            touch-action: manipulation; /* Improves touch response */
         }
 
         button:active {
             transform: scale(0.96);
+            background-color: #0099cc;
         }
         
         #start-screen h1 {
@@ -113,13 +118,13 @@
         <div id="start-screen">
             <h1>Teary<br>Teardrop</h1>
             <p>Tap to help Teary avoid Rugs!</p>
-            <button onclick="startGame()">Start Game</button>
+            <button id="start-btn" onclick="startGame()">Start Game</button>
         </div>
 
         <div id="game-over-screen" class="hidden">
             <h1>RUGGED!</h1>
             <p>Score: <span id="final-score">0</span></p>
-            <button onclick="resetGame()">Continue to Avoid Rugs with $Teary</button>
+            <button id="restart-btn" onclick="resetGame()">Continue to Avoid Rugs with $Teary</button>
         </div>
     </div>
 
@@ -147,7 +152,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- TEARY OBJECT (Code-Drawn) ---
+        // --- TEARY OBJECT (Code-Drawn with Smile & Bowtie) ---
         const teary = {
             x: 50,
             y: 150,
@@ -166,100 +171,52 @@
                 ctx.beginPath();
                 ctx.fillStyle = '#00bfff'; // Baby Blue
                 ctx.moveTo(centerX, centerY - size * 1.5);
-                ctx.bezierCurveTo(
-                    centerX + size, centerY - size * 0.5, 
-                    centerX + size, centerY + size, 
-                    centerX, centerY + size
-                );
-                ctx.bezierCurveTo(
-                    centerX - size, centerY + size, 
-                    centerX - size, centerY - size * 0.5, 
-                    centerX, centerY - size * 1.5
-                );
+                ctx.bezierCurveTo(centerX + size, centerY - size * 0.5, centerX + size, centerY + size, centerX, centerY + size);
+                ctx.bezierCurveTo(centerX - size, centerY + size, centerX - size, centerY - size * 0.5, centerX, centerY - size * 1.5);
                 ctx.fill();
                 
-                // Shine effect
+                // Shine
                 let grad = ctx.createRadialGradient(centerX - 5, centerY + 5, 2, centerX, centerY, size);
                 grad.addColorStop(0, '#4dd2ff');
                 grad.addColorStop(1, '#00bfff');
                 ctx.fillStyle = grad;
                 ctx.fill();
 
-                // 2. Draw Eyes
+                // 2. Eyes
                 ctx.fillStyle = 'white';
-                // Left Eye
-                ctx.beginPath();
-                ctx.ellipse(centerX - 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2);
-                ctx.fill();
-                // Right Eye
-                ctx.beginPath();
-                ctx.ellipse(centerX + 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.ellipse(centerX - 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(centerX + 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2); ctx.fill();
 
-                // 3. Draw Pupils
+                // 3. Pupils
                 ctx.fillStyle = 'black';
-                // Left Pupil
-                ctx.beginPath();
-                ctx.arc(centerX - 6, centerY + 2, 3, 0, Math.PI * 2);
-                ctx.fill();
-                // Right Pupil
-                ctx.beginPath();
-                ctx.arc(centerX + 6, centerY + 2, 3, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(centerX - 6, centerY + 2, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(centerX + 6, centerY + 2, 3, 0, Math.PI * 2); ctx.fill();
 
-                // 4. Draw Shine in Eyes
+                // 4. Shine
                 ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(centerX - 5, centerY, 1.5, 0, Math.PI * 2);
-                ctx.arc(centerX + 7, centerY, 1.5, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(centerX - 5, centerY, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(centerX + 7, centerY, 1.5, 0, Math.PI * 2); ctx.fill();
 
-                // 5. Draw Smile
+                // 5. Smile
                 ctx.beginPath();
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = 'black';
                 ctx.arc(centerX, centerY + 6, 8, 0.2 * Math.PI, 0.8 * Math.PI);
                 ctx.stroke();
 
-                // 6. Draw Red Bowtie
+                // 6. Red Bowtie
                 ctx.fillStyle = '#ff4d4d'; 
                 const tieY = centerY + 16; 
-
-                // Left part of tie
-                ctx.beginPath();
-                ctx.moveTo(centerX, tieY);
-                ctx.lineTo(centerX - 10, tieY - 4);
-                ctx.lineTo(centerX - 10, tieY + 4);
-                ctx.closePath();
-                ctx.fill();
-
-                // Right part of tie
-                ctx.beginPath();
-                ctx.moveTo(centerX, tieY);
-                ctx.lineTo(centerX + 10, tieY - 4);
-                ctx.lineTo(centerX + 10, tieY + 4);
-                ctx.closePath();
-                ctx.fill();
-
-                // Center knot
-                ctx.beginPath();
-                ctx.arc(centerX, tieY, 2.5, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.moveTo(centerX, tieY); ctx.lineTo(centerX - 10, tieY - 4); ctx.lineTo(centerX - 10, tieY + 4); ctx.closePath(); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(centerX, tieY); ctx.lineTo(centerX + 10, tieY - 4); ctx.lineTo(centerX + 10, tieY + 4); ctx.closePath(); ctx.fill();
+                ctx.beginPath(); ctx.arc(centerX, tieY, 2.5, 0, Math.PI * 2); ctx.fill();
             },
             
             update: function() {
                 this.velocity += this.gravity;
                 this.y += this.velocity;
-
-                if (this.y + this.height/2 >= canvas.height) {
-                    this.y = canvas.height - this.height/2;
-                    gameOver();
-                }
-                
-                if (this.y - this.height/2 <= 0) {
-                    this.y = this.height/2;
-                    this.velocity = 0;
-                }
+                if (this.y + this.height/2 >= canvas.height) { this.y = canvas.height - this.height/2; gameOver(); }
+                if (this.y - this.height/2 <= 0) { this.y = this.height/2; this.velocity = 0; }
             },
             
             flap: function() {
@@ -277,22 +234,15 @@
             draw: function() {
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
-                    
                     // Top Candle
                     let gradTop = ctx.createLinearGradient(p.x, 0, p.x + this.width, 0);
-                    gradTop.addColorStop(0, '#ff4d4d');
-                    gradTop.addColorStop(0.5, '#cc0000');
-                    gradTop.addColorStop(1, '#ff4d4d');
-                    ctx.fillStyle = gradTop;
-                    ctx.fillRect(p.x, 0, this.width, p.top);
+                    gradTop.addColorStop(0, '#ff4d4d'); gradTop.addColorStop(0.5, '#cc0000'); gradTop.addColorStop(1, '#ff4d4d');
+                    ctx.fillStyle = gradTop; ctx.fillRect(p.x, 0, this.width, p.top);
 
                     // Bottom Candle
                     let gradBot = ctx.createLinearGradient(p.x, canvas.height - p.bottom, p.x + this.width, canvas.height - p.bottom);
-                    gradBot.addColorStop(0, '#ff4d4d');
-                    gradBot.addColorStop(0.5, '#cc0000');
-                    gradBot.addColorStop(1, '#ff4d4d');
-                    ctx.fillStyle = gradBot;
-                    ctx.fillRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
+                    gradBot.addColorStop(0, '#ff4d4d'); gradBot.addColorStop(0.5, '#cc0000'); gradBot.addColorStop(1, '#ff4d4d');
+                    ctx.fillStyle = gradBot; ctx.fillRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
                     
                     // Wicks
                     ctx.fillStyle = '#fff';
@@ -305,43 +255,24 @@
                 if (frames % 110 === 0) {
                     let maxTop = canvas.height - this.gap - 50;
                     let topHeight = Math.floor(Math.random() * (maxTop - 50)) + 50;
-                    
-                    this.list.push({
-                        x: canvas.width,
-                        top: topHeight,
-                        bottom: canvas.height - this.gap - topHeight,
-                        passed: false
-                    });
+                    this.list.push({ x: canvas.width, top: topHeight, bottom: canvas.height - this.gap - topHeight, passed: false });
                 }
                 
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
                     p.x -= this.dx;
-                    
-                    // Collision (Simplified box)
-                    if (teary.x + teary.width/3 > p.x && 
-                        teary.x - teary.width/3 < p.x + this.width) {
-                            if (teary.y - teary.height/3 < p.top || 
-                                teary.y + teary.height/3 > canvas.height - p.bottom) {
-                                gameOver();
-                            }
+                    // Collision
+                    if (teary.x + teary.width/3 > p.x && teary.x - teary.width/3 < p.x + this.width) {
+                        if (teary.y - teary.height/3 < p.top || teary.y + teary.height/3 > canvas.height - p.bottom) { gameOver(); }
                     }
-                    
                     // Score
                     if (p.x + this.width < teary.x && !p.passed) {
                         score++;
                         document.getElementById('score-display').innerText = score;
                         p.passed = true;
-                        
-                        if(tg.HapticFeedback) {
-                            tg.HapticFeedback.impactOccurred('medium');
-                        }
+                        if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
                     }
-                    
-                    if (p.x + this.width <= 0) {
-                        this.list.shift();
-                        i--;
-                    }
+                    if (p.x + this.width <= 0) { this.list.shift(); i--; }
                 }
             },
             
@@ -350,10 +281,21 @@
             }
         };
 
-        // --- INPUT ---
+        // --- INPUT HANDLING (CRITICAL FIX FOR MOBILE) ---
         function handleInput(e) {
+            // CRITICAL FIX: If we touched a button, do NOT preventDefault.
+            // Let the browser handle the button click.
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                return;
+            }
+
             if(e.type === 'keydown' && e.code !== 'Space') return;
-            if(e.type === 'touchstart') e.preventDefault();
+            
+            // Only prevent default if we are NOT clicking a button
+            // This prevents scrolling/zooming while playing
+            if(e.type === 'touchstart') {
+                e.preventDefault();
+            }
             
             if(gameRunning) {
                 teary.flap();
@@ -361,6 +303,7 @@
         }
 
         window.addEventListener('keydown', handleInput);
+        // passive: false allows us to use preventDefault()
         window.addEventListener('touchstart', handleInput, {passive: false});
         window.addEventListener('mousedown', handleInput);
 
@@ -372,13 +315,14 @@
             obstacles.update();
             obstacles.draw();
             frames++;
-            if(gameRunning) {
-                animationId = requestAnimationFrame(loop);
-            }
+            if(gameRunning) animationId = requestAnimationFrame(loop);
         }
 
         // --- STATE ---
         function startGame() {
+            // Double check cleanup in case of multiple clicks
+            if(gameRunning) return;
+
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('score-display').innerText = '0';
@@ -396,11 +340,7 @@
         function gameOver() {
             gameRunning = false;
             cancelAnimationFrame(animationId);
-            
-            if(tg.HapticFeedback) {
-                tg.HapticFeedback.notificationOccurred('error');
-            }
-
+            if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             document.getElementById('final-score').innerText = score;
             document.getElementById('game-over-screen').classList.remove('hidden');
         }
