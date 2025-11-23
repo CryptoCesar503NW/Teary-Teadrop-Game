@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Teary Teardrop Game</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a; /* Dark Casino Background */
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            touch-action: none; /* Prevents zooming on double tap */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(to bottom, #2c3e50, #000000);
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #score-display {
+            position: absolute;
+            top: 50px;
+            font-size: 40px;
+            color: #ffffff;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 10;
+        }
+
+        #start-screen, #game-over-screen {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #00bfff; /* Teardrop Blue */
+            pointer-events: auto; /* Enable clicking on buttons */
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            color: #00bfff;
+            margin: 0 0 10px 0;
+        }
+
+        p {
+            color: #fff;
+            font-size: 18px;
+        }
+
+        button {
+            background-color: #00bfff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="score-display">0</div>
+        
+        <div id="start-screen">
+            <h1>Teary Teardrop</h1>
+            <p>Tap to Fly!</p>
+            <p>Don't hit the Red Candles.</p>
+            <button onclick="startGame()">Play</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1>Wiped Out!</h1>
+            <p>Score: <span id="final-score">0</span></p>
+            <button onclick="resetGame()">Try Again</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // --- TELEGRAM SETUP ---
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand(); // Force full screen in Telegram
+        
+        // --- ASSETS (Using placeholders, replace src with your images) ---
+        // If you have a teary.png, uncomment the image loading logic below.
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- GAME VARIABLES ---
+        let frames = 0;
+        let score = 0;
+        let gameRunning = false;
+        let animationId;
+
+        // Resize canvas to fit mobile screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // --- TEARY OBJECT ---
+        const teary = {
+            x: 50,
+            y: 150,
+            width: 30,
+            height: 30,
+            gravity: 0.25, // Gravity pull
+            lift: -6,      // Jump strength
+            velocity: 0,
+            
+            draw: function() {
+                ctx.fillStyle = '#00bfff'; // Teardrop Blue color
+                
+                // Draw a teardrop shape (or replace with ctx.drawImage if you have sprite)
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                
+                // Add eyes (Teary look)
+                ctx.fillStyle = 'white';
+                ctx.fillRect(this.x - 5, this.y - 5, 4, 4);
+                ctx.fillRect(this.x + 2, this.y - 5, 4, 4);
+            },
+            
+            update: function() {
+                this.velocity += this.gravity;
+                this.y += this.velocity;
+
+                // Floor collision
+                if (this.y + this.height/2 >= canvas.height) {
+                    this.y = canvas.height - this.height/2;
+                    gameOver();
+                }
+                
+                // Ceiling collision
+                if (this.y - this.height/2 <= 0) {
+                    this.y = this.height/2;
+                    this.velocity = 0;
+                }
+            },
+            
+            flap: function() {
+                this.velocity = this.lift;
+            }
+        };
+
+        // --- OBSTACLES (Red Candles) ---
+        const obstacles = {
+            list: [],
+            width: 50,
+            gap: 180, // Space between top and bottom pipe
+            dx: 3, // Speed moving left
+            
+            draw: function() {
+                ctx.fillStyle = '#ff4d4d'; // Red Candle Color
+                
+                for(let i = 0; i < this.list.length; i++) {
+                    let p = this.list[i];
+                    
+                    // Top Pipe
+                    ctx.fillRect(p.x, 0, this.width, p.top);
+                    // Bottom Pipe
+                    ctx.fillRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
+                    
+                    // Visual Detail: Candle Wicks
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(p.x + 23, p.top - 10, 4, 10); // Top wick
+                    ctx.fillRect(p.x + 23, canvas.height - p.bottom, 4, 10); // Bottom wick
+                    ctx.fillStyle = '#ff4d4d'; // Reset color
+                }
+            },
+            
+            update: function() {
+                // Add new obstacle every 120 frames
+                if (frames % 120 === 0) {
+                    // Randomize height
+                    let maxTop = canvas.height - this.gap - 50; // 50 padding
+                    let topHeight = Math.floor(Math.random() * (maxTop - 50)) + 50;
+                    
+                    this.list.push({
+                        x: canvas.width,
+                        top: topHeight,
+                        bottom: canvas.height - this.gap - topHeight
+                    });
+                }
+                
+                for(let i = 0; i < this.list.length; i++) {
+                    let p = this.list[i];
+                    p.x -= this.dx;
+                    
+                    // Collision Detection
+                    if (teary.x + teary.width/2 > p.x && 
+                        teary.x - teary.width/2 < p.x + this.width) {
+                            // Hits Top Pipe OR Hits Bottom Pipe
+                            if (teary.y - teary.height/2 < p.top || 
+                                teary.y + teary.height/2 > canvas.height - p.bottom) {
+                                gameOver();
+                            }
+                    }
+                    
+                    // Score Update
+                    if (p.x + this.width < teary.x && !p.passed) {
+                        score++;
+                        document.getElementById('score-display').innerText = score;
+                        p.passed = true;
+                        
+                        // Haptic feedback on Telegram
+                        if(tg.HapticFeedback) {
+                            tg.HapticFeedback.impactOccurred('light');
+                        }
+                    }
+                    
+                    // Remove off-screen pipes
+                    if (p.x + this.width <= 0) {
+                        this.list.shift();
+                        i--; // Adjust index since we removed an element
+                    }
+                }
+            },
+            
+            reset: function() {
+                this.list = [];
+            }
+        };
+
+        // --- INPUT HANDLING ---
+        window.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                if(gameRunning) teary.flap();
+            }
+        });
+
+        window.addEventListener('touchstart', function(e) {
+            if(gameRunning) {
+                teary.flap();
+                e.preventDefault(); // Prevent scrolling
+            }
+        }, {passive: false});
+        
+        // Also support mouse click for desktop testing
+        window.addEventListener('mousedown', function(e) {
+             if(gameRunning) teary.flap();
+        });
+
+        // --- MAIN LOOP ---
+        function loop() {
+            // Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Update and Draw
+            teary.draw();
+            teary.update();
+            
+            obstacles.draw();
+            obstacles.update();
+            
+            frames++;
+            
+            if(gameRunning) {
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        // --- GAME STATE FUNCTIONS ---
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('score-display').innerText = '0';
+            
+            // Reset variables
+            score = 0;
+            frames = 0;
+            teary.y = 150;
+            teary.velocity = 0;
+            obstacles.reset();
+            
+            gameRunning = true;
+            loop();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            
+            // Haptic feedback for Game Over
+            if(tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('error');
+            }
+
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        // Handle resizing
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+    </script>
+</body>
+</html>
