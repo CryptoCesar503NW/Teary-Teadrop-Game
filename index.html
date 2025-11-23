@@ -107,17 +107,6 @@
         #start-screen h1 {
             color: #00bfff;
         }
-        
-        /* Volume Toggle (Optional Visual) */
-        #sound-toggle {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            font-size: 24px;
-            color: white;
-            opacity: 0.5;
-            pointer-events: auto;
-        }
     </style>
 </head>
 <body>
@@ -149,7 +138,6 @@
         const ctx = canvas.getContext('2d');
 
         // --- AUDIO SYSTEM (Web Audio API) ---
-        // Generates arcade sounds without needing mp3 files
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
 
@@ -174,17 +162,23 @@
             const now = audioCtx.currentTime;
 
             if (type === 'jump') {
-                // Short, rising pitch (Sine wave)
+                // --- NEW "TEARDROP" BLOOP SOUND ---
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(300, now);
-                osc.frequency.exponentialRampToValueAtTime(500, now + 0.1);
-                gainNode.gain.setValueAtTime(0.3, now);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                
+                // Pitch Envelope: 400Hz rising quickly to 900Hz creates a "water drop" bloop
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(900, now + 0.15);
+                
+                // Volume Envelope: Quick fade in and out
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.6, now + 0.02); // Attack
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15); // Decay
+                
                 osc.start(now);
-                osc.stop(now + 0.1);
+                osc.stop(now + 0.15);
             } 
             else if (type === 'score') {
-                // High ding (Square wave)
+                // High ding
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(800, now);
                 osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
@@ -194,7 +188,7 @@
                 osc.stop(now + 0.15);
             }
             else if (type === 'die') {
-                // Low crash (Sawtooth)
+                // Low crash
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(150, now);
                 osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
@@ -211,7 +205,6 @@
         let gameRunning = false;
         let animationId;
         
-        // Difficulty Setting
         let baseSpeed = 3.5;
         let currentSpeed = 3.5;
 
@@ -222,14 +215,14 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- TEARY OBJECT (With Top Hat & Bowtie) ---
+        // --- TEARY OBJECT ---
         const teary = {
             x: 50,
             y: 150,
             width: 40,  
             height: 40,
-            gravity: 0.5,  // Fast gravity
-            lift: -7.5,    // Snappy jump
+            gravity: 0.5,  
+            lift: -7.5,   
             velocity: 0,
             
             draw: function() {
@@ -237,15 +230,17 @@
                 const centerY = this.y;
                 const size = this.width / 2;
 
-                // --- 1. Top Hat (New!) ---
-                // The hat sits on top of the head (y - size * 1.5)
-                const hatY = centerY - size * 1.5;
+                // --- 1. Top Hat (Adjusted Position) ---
+                // Lowered the hat by reducing the negative multiplier
+                // Old was: centerY - size * 1.5
+                // New is:  centerY - size * 1.35 (This brings it down onto the head)
+                const hatY = centerY - size * 1.35; 
                 
                 // Hat Brim
                 ctx.fillStyle = 'black';
                 ctx.fillRect(centerX - 18, hatY - 2, 36, 6);
                 
-                // Hat Body (Main black part)
+                // Hat Body
                 ctx.fillRect(centerX - 12, hatY - 22, 24, 20);
                 
                 // Hat Stripe (Red)
@@ -307,7 +302,7 @@
             
             flap: function() {
                 this.velocity = this.lift;
-                playSound('jump'); // Play Sound
+                playSound('jump'); // Classic Droplet Sound
             }
         };
 
@@ -336,11 +331,8 @@
             },
             
             update: function() {
-                // PROGRESSIVE DIFFICULTY:
-                // Increase speed by 0.1 for every 5 points scored. Max speed 6.
+                // Progressive Difficulty
                 currentSpeed = baseSpeed + Math.min(Math.floor(score / 5) * 0.2, 3);
-                
-                // Spawn frequency adjusts with speed so gaps remain playable
                 let spawnRate = Math.max(70, 100 - Math.floor(score * 1.5));
 
                 if (frames % spawnRate === 0) {
@@ -351,7 +343,7 @@
                 
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
-                    p.x -= currentSpeed; // Use progressive speed
+                    p.x -= currentSpeed;
                     
                     if (teary.x + teary.width/3 > p.x && teary.x - teary.width/3 < p.x + this.width) {
                         if (teary.y - teary.height/3 < p.top || teary.y + teary.height/3 > canvas.height - p.bottom) { gameOver(); }
@@ -360,7 +352,7 @@
                         score++;
                         document.getElementById('score-display').innerText = score;
                         p.passed = true;
-                        playSound('score'); // Play Sound
+                        playSound('score');
                         if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
                     }
                     if (p.x + this.width <= 0) { this.list.shift(); i--; }
@@ -369,7 +361,7 @@
             
             reset: function() {
                 this.list = [];
-                currentSpeed = baseSpeed; // Reset speed
+                currentSpeed = baseSpeed;
             }
         };
 
@@ -403,7 +395,7 @@
 
         // --- STATE ---
         function startGame() {
-            initAudio(); // Initialize audio context on first user interaction
+            initAudio(); 
             if(gameRunning) return;
 
             document.getElementById('start-screen').classList.add('hidden');
@@ -423,7 +415,7 @@
         function gameOver() {
             gameRunning = false;
             cancelAnimationFrame(animationId);
-            playSound('die'); // Play Sound
+            playSound('die'); 
             if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             document.getElementById('final-score').innerText = score;
             document.getElementById('game-over-screen').classList.remove('hidden');
