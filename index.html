@@ -12,10 +12,10 @@
             background-color: #1a1a1a; 
             overflow: hidden;
             font-family: 'Arial', sans-serif;
-            touch-action: none; /* Stops zooming/scrolling */
+            touch-action: none; 
             user-select: none;
             -webkit-user-select: none;
-            -webkit-tap-highlight-color: transparent; /* Removes blue tap box on Android */
+            -webkit-tap-highlight-color: transparent; 
         }
 
         canvas {
@@ -31,7 +31,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Lets clicks pass through to canvas... */
+            pointer-events: none; 
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -49,7 +49,6 @@
             z-index: 10;
         }
 
-        /* POINTER EVENTS AUTO allows buttons inside the layer to be clicked */
         #start-screen, #game-over-screen {
             background: rgba(0, 0, 0, 0.9);
             padding: 30px;
@@ -87,7 +86,7 @@
             background-color: #00bfff;
             color: white;
             border: none;
-            padding: 20px 30px; /* Larger hit area for mobile */
+            padding: 20px 30px; 
             font-size: 18px;
             border-radius: 50px;
             cursor: pointer;
@@ -97,7 +96,7 @@
             white-space: normal;
             line-height: 1.2;
             transition: transform 0.1s;
-            touch-action: manipulation; /* Improves touch response */
+            touch-action: manipulation; 
         }
 
         button:active {
@@ -107,6 +106,17 @@
         
         #start-screen h1 {
             color: #00bfff;
+        }
+        
+        /* Volume Toggle (Optional Visual) */
+        #sound-toggle {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: white;
+            opacity: 0.5;
+            pointer-events: auto;
         }
     </style>
 </head>
@@ -131,7 +141,6 @@
     <canvas id="gameCanvas"></canvas>
 
     <script>
-        // --- TELEGRAM SETUP ---
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
@@ -139,11 +148,72 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // --- AUDIO SYSTEM (Web Audio API) ---
+        // Generates arcade sounds without needing mp3 files
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'jump') {
+                // Short, rising pitch (Sine wave)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(500, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } 
+            else if (type === 'score') {
+                // High ding (Square wave)
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+            else if (type === 'die') {
+                // Low crash (Sawtooth)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
         // --- GAME VARIABLES ---
         let frames = 0;
         let score = 0;
         let gameRunning = false;
         let animationId;
+        
+        // Difficulty Setting
+        let baseSpeed = 3.5;
+        let currentSpeed = 3.5;
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -152,16 +222,14 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- TEARY OBJECT (Code-Drawn with Smile & Bowtie) ---
+        // --- TEARY OBJECT (With Top Hat & Bowtie) ---
         const teary = {
             x: 50,
             y: 150,
             width: 40,  
             height: 40,
-            
-            // --- PHYSICS UPDATES HERE ---
-            gravity: 0.5,  // Increased from 0.25 (Falls faster = feels less laggy)
-            lift: -7.5,    // Increased magnitude slightly to combat gravity, but net result is shorter jump
+            gravity: 0.5,  // Fast gravity
+            lift: -7.5,    // Snappy jump
             velocity: 0,
             
             draw: function() {
@@ -169,7 +237,22 @@
                 const centerY = this.y;
                 const size = this.width / 2;
 
-                // 1. Draw The Teardrop Body
+                // --- 1. Top Hat (New!) ---
+                // The hat sits on top of the head (y - size * 1.5)
+                const hatY = centerY - size * 1.5;
+                
+                // Hat Brim
+                ctx.fillStyle = 'black';
+                ctx.fillRect(centerX - 18, hatY - 2, 36, 6);
+                
+                // Hat Body (Main black part)
+                ctx.fillRect(centerX - 12, hatY - 22, 24, 20);
+                
+                // Hat Stripe (Red)
+                ctx.fillStyle = '#ff4d4d';
+                ctx.fillRect(centerX - 12, hatY - 8, 24, 4);
+
+                // --- 2. Body ---
                 ctx.beginPath();
                 ctx.fillStyle = '#00bfff'; // Baby Blue
                 ctx.moveTo(centerX, centerY - size * 1.5);
@@ -184,29 +267,30 @@
                 ctx.fillStyle = grad;
                 ctx.fill();
 
-                // 2. Eyes
+                // --- 3. Face ---
+                // Eyes
                 ctx.fillStyle = 'white';
                 ctx.beginPath(); ctx.ellipse(centerX - 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.ellipse(centerX + 6, centerY + 2, 6, 8, 0, 0, Math.PI * 2); ctx.fill();
 
-                // 3. Pupils
+                // Pupils
                 ctx.fillStyle = 'black';
                 ctx.beginPath(); ctx.arc(centerX - 6, centerY + 2, 3, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(centerX + 6, centerY + 2, 3, 0, Math.PI * 2); ctx.fill();
 
-                // 4. Shine
+                // Eye Shine
                 ctx.fillStyle = 'white';
                 ctx.beginPath(); ctx.arc(centerX - 5, centerY, 1.5, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(centerX + 7, centerY, 1.5, 0, Math.PI * 2); ctx.fill();
 
-                // 5. Smile
+                // Smile
                 ctx.beginPath();
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = 'black';
                 ctx.arc(centerX, centerY + 6, 8, 0.2 * Math.PI, 0.8 * Math.PI);
                 ctx.stroke();
 
-                // 6. Red Bowtie
+                // --- 4. Bowtie ---
                 ctx.fillStyle = '#ff4d4d'; 
                 const tieY = centerY + 16; 
                 ctx.beginPath(); ctx.moveTo(centerX, tieY); ctx.lineTo(centerX - 10, tieY - 4); ctx.lineTo(centerX - 10, tieY + 4); ctx.closePath(); ctx.fill();
@@ -223,25 +307,23 @@
             
             flap: function() {
                 this.velocity = this.lift;
+                playSound('jump'); // Play Sound
             }
         };
 
-        // --- OBSTACLES (Red Candles) ---
+        // --- OBSTACLES ---
         const obstacles = {
             list: [],
             width: 55,
-            gap: 200, // Slightly wider gap for faster gameplay
-            dx: 3.5,  // Speed increased slightly (from 3 to 3.5) for "snappy" feel
+            gap: 200, 
             
             draw: function() {
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
-                    // Top Candle
                     let gradTop = ctx.createLinearGradient(p.x, 0, p.x + this.width, 0);
                     gradTop.addColorStop(0, '#ff4d4d'); gradTop.addColorStop(0.5, '#cc0000'); gradTop.addColorStop(1, '#ff4d4d');
                     ctx.fillStyle = gradTop; ctx.fillRect(p.x, 0, this.width, p.top);
 
-                    // Bottom Candle
                     let gradBot = ctx.createLinearGradient(p.x, canvas.height - p.bottom, p.x + this.width, canvas.height - p.bottom);
                     gradBot.addColorStop(0, '#ff4d4d'); gradBot.addColorStop(0.5, '#cc0000'); gradBot.addColorStop(1, '#ff4d4d');
                     ctx.fillStyle = gradBot; ctx.fillRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
@@ -254,8 +336,14 @@
             },
             
             update: function() {
-                // Spawn rate adjusted for speed
-                if (frames % 100 === 0) {
+                // PROGRESSIVE DIFFICULTY:
+                // Increase speed by 0.1 for every 5 points scored. Max speed 6.
+                currentSpeed = baseSpeed + Math.min(Math.floor(score / 5) * 0.2, 3);
+                
+                // Spawn frequency adjusts with speed so gaps remain playable
+                let spawnRate = Math.max(70, 100 - Math.floor(score * 1.5));
+
+                if (frames % spawnRate === 0) {
                     let maxTop = canvas.height - this.gap - 50;
                     let topHeight = Math.floor(Math.random() * (maxTop - 50)) + 50;
                     this.list.push({ x: canvas.width, top: topHeight, bottom: canvas.height - this.gap - topHeight, passed: false });
@@ -263,16 +351,16 @@
                 
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
-                    p.x -= this.dx;
-                    // Collision
+                    p.x -= currentSpeed; // Use progressive speed
+                    
                     if (teary.x + teary.width/3 > p.x && teary.x - teary.width/3 < p.x + this.width) {
                         if (teary.y - teary.height/3 < p.top || teary.y + teary.height/3 > canvas.height - p.bottom) { gameOver(); }
                     }
-                    // Score
                     if (p.x + this.width < teary.x && !p.passed) {
                         score++;
                         document.getElementById('score-display').innerText = score;
                         p.passed = true;
+                        playSound('score'); // Play Sound
                         if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
                     }
                     if (p.x + this.width <= 0) { this.list.shift(); i--; }
@@ -281,22 +369,17 @@
             
             reset: function() {
                 this.list = [];
+                currentSpeed = baseSpeed; // Reset speed
             }
         };
 
         // --- INPUT HANDLING ---
         function handleInput(e) {
-            // Check if button click
             if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
                 return;
             }
-
             if(e.type === 'keydown' && e.code !== 'Space') return;
-            
-            // Prevent default only on game canvas taps
-            if(e.type === 'touchstart') {
-                e.preventDefault();
-            }
+            if(e.type === 'touchstart') e.preventDefault();
             
             if(gameRunning) {
                 teary.flap();
@@ -320,6 +403,7 @@
 
         // --- STATE ---
         function startGame() {
+            initAudio(); // Initialize audio context on first user interaction
             if(gameRunning) return;
 
             document.getElementById('start-screen').classList.add('hidden');
@@ -339,6 +423,7 @@
         function gameOver() {
             gameRunning = false;
             cancelAnimationFrame(animationId);
+            playSound('die'); // Play Sound
             if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             document.getElementById('final-score').innerText = score;
             document.getElementById('game-over-screen').classList.remove('hidden');
