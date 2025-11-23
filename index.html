@@ -9,10 +9,12 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #1a1a1a; /* Dark Casino Background */
+            background-color: #1a1a1a; 
             overflow: hidden;
             font-family: 'Arial', sans-serif;
-            touch-action: none; /* Prevents zooming on double tap */
+            touch-action: none; 
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         canvas {
@@ -20,6 +22,7 @@
             width: 100%;
             height: 100vh;
             background: linear-gradient(to bottom, #2c3e50, #000000);
+            image-rendering: -webkit-optimize-contrast; /* Helps with sharpness */
         }
 
         #ui-layer {
@@ -39,7 +42,7 @@
         #score-display {
             position: absolute;
             top: 50px;
-            font-size: 40px;
+            font-size: 50px;
             color: #ffffff;
             font-weight: bold;
             text-shadow: 2px 2px 4px #000;
@@ -47,11 +50,13 @@
         }
 
         #start-screen, #game-over-screen {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            border-radius: 15px;
-            border: 2px solid #00bfff; /* Teardrop Blue */
-            pointer-events: auto; /* Enable clicking on buttons */
+            background: rgba(0, 0, 0, 0.85);
+            padding: 25px;
+            border-radius: 20px;
+            border: 3px solid #00bfff; 
+            pointer-events: auto;
+            width: 80%; /* Width relative to phone screen */
+            max-width: 350px;
         }
 
         .hidden {
@@ -59,29 +64,42 @@
         }
 
         h1 {
-            color: #00bfff;
+            color: #ff4d4d; /* Red color for Rugged! */
             margin: 0 0 10px 0;
+            font-size: 36px;
+            text-transform: uppercase;
+            text-shadow: 2px 2px #000;
         }
 
         p {
             color: #fff;
             font-size: 18px;
+            margin-bottom: 20px;
         }
 
+        /* Updated Button Styling for Longer Text */
         button {
             background-color: #00bfff;
             color: white;
             border: none;
-            padding: 15px 30px;
-            font-size: 20px;
-            border-radius: 30px;
+            padding: 12px 20px; /* Adjusted padding */
+            font-size: 16px;    /* Slightly smaller font to fit the long text */
+            border-radius: 50px;
             cursor: pointer;
-            margin-top: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,191,255,0.4);
+            font-weight: bold;
+            width: 100%;        /* Make button fill the container */
+            white-space: normal; /* Allow text to wrap if needed */
+            line-height: 1.2;
         }
 
         button:active {
-            transform: scale(0.95);
+            transform: scale(0.96);
+        }
+        
+        /* Specific style for start title */
+        #start-screen h1 {
+            color: #00bfff;
         }
     </style>
 </head>
@@ -91,32 +109,31 @@
         <div id="score-display">0</div>
         
         <div id="start-screen">
-            <h1>Teary Teardrop</h1>
-            <p>Tap to Fly!</p>
-            <p>Don't hit the Red Candles.</p>
-            <button onclick="startGame()">Play</button>
+            <h1>Teary<br>Teardrop</h1>
+            <p>Tap to Keep Teary Afloat!</p>
+            <button onclick="startGame()">Start Game</button>
         </div>
 
         <div id="game-over-screen" class="hidden">
-            <h1>Wiped Out!</h1>
+            <h1>RUGGED!</h1>
             <p>Score: <span id="final-score">0</span></p>
-            <button onclick="resetGame()">Try Again</button>
+            <button onclick="resetGame()">Continue to Avoid Rugs with $Teary</button>
         </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <script>
-        // --- TELEGRAM SETUP ---
         const tg = window.Telegram.WebApp;
         tg.ready();
-        tg.expand(); // Force full screen in Telegram
-        
-        // --- ASSETS (Using placeholders, replace src with your images) ---
-        // If you have a teary.png, uncomment the image loading logic below.
-        
+        tg.expand();
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+
+        // --- ASSETS ---
+        const tearyImg = new Image();
+        tearyImg.src = 'teary.png'; 
 
         // --- GAME VARIABLES ---
         let frames = 0;
@@ -124,41 +141,45 @@
         let gameRunning = false;
         let animationId;
 
-        // Resize canvas to fit mobile screen
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        // --- TEARY OBJECT ---
-        // Load the image
-        const tearyImg = new Image();
-        tearyImg.src = 'teary.png'; 
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
         // --- TEARY OBJECT ---
         const teary = {
             x: 50,
             y: 150,
-            width: 40,  // Slightly larger for the image
-            height: 40,
+            width: 45,  
+            height: 45,
             gravity: 0.25,
-            lift: -6,
+            lift: -5.5,
             velocity: 0,
             
             draw: function() {
-                // Draw the image instead of the blue circle
-                ctx.drawImage(tearyImg, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                if (tearyImg.complete && tearyImg.naturalHeight !== 0) {
+                    // Draw image
+                    ctx.drawImage(tearyImg, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                } else {
+                    // Fallback Circle (Blue)
+                    ctx.fillStyle = '#00bfff';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             },
             
             update: function() {
                 this.velocity += this.gravity;
                 this.y += this.velocity;
 
-                // Floor collision
                 if (this.y + this.height/2 >= canvas.height) {
                     this.y = canvas.height - this.height/2;
                     gameOver();
                 }
                 
-                // Ceiling collision
                 if (this.y - this.height/2 <= 0) {
                     this.y = this.height/2;
                     this.velocity = 0;
@@ -169,43 +190,51 @@
                 this.velocity = this.lift;
             }
         };
+
         // --- OBSTACLES (Red Candles) ---
         const obstacles = {
             list: [],
-            width: 50,
-            gap: 180, // Space between top and bottom pipe
-            dx: 3, // Speed moving left
+            width: 55,
+            gap: 190, 
+            dx: 3, 
             
             draw: function() {
-                ctx.fillStyle = '#ff4d4d'; // Red Candle Color
-                
                 for(let i = 0; i < this.list.length; i++) {
                     let p = this.list[i];
                     
-                    // Top Pipe
+                    // Top Candle (Red Gradient)
+                    let gradTop = ctx.createLinearGradient(p.x, 0, p.x + this.width, 0);
+                    gradTop.addColorStop(0, '#ff4d4d');
+                    gradTop.addColorStop(0.5, '#cc0000'); // Darker red center
+                    gradTop.addColorStop(1, '#ff4d4d');
+                    ctx.fillStyle = gradTop;
                     ctx.fillRect(p.x, 0, this.width, p.top);
-                    // Bottom Pipe
+
+                    // Bottom Candle
+                    let gradBot = ctx.createLinearGradient(p.x, canvas.height - p.bottom, p.x + this.width, canvas.height - p.bottom);
+                    gradBot.addColorStop(0, '#ff4d4d');
+                    gradBot.addColorStop(0.5, '#cc0000');
+                    gradBot.addColorStop(1, '#ff4d4d');
+                    ctx.fillStyle = gradBot;
                     ctx.fillRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
                     
-                    // Visual Detail: Candle Wicks
+                    // Wicks
                     ctx.fillStyle = '#fff';
-                    ctx.fillRect(p.x + 23, p.top - 10, 4, 10); // Top wick
-                    ctx.fillRect(p.x + 23, canvas.height - p.bottom, 4, 10); // Bottom wick
-                    ctx.fillStyle = '#ff4d4d'; // Reset color
+                    ctx.fillRect(p.x + (this.width/2) - 2, p.top - 15, 4, 15); 
+                    ctx.fillRect(p.x + (this.width/2) - 2, canvas.height - p.bottom, 4, 15); 
                 }
             },
             
             update: function() {
-                // Add new obstacle every 120 frames
-                if (frames % 120 === 0) {
-                    // Randomize height
-                    let maxTop = canvas.height - this.gap - 50; // 50 padding
+                if (frames % 110 === 0) {
+                    let maxTop = canvas.height - this.gap - 50;
                     let topHeight = Math.floor(Math.random() * (maxTop - 50)) + 50;
                     
                     this.list.push({
                         x: canvas.width,
                         top: topHeight,
-                        bottom: canvas.height - this.gap - topHeight
+                        bottom: canvas.height - this.gap - topHeight,
+                        passed: false
                     });
                 }
                 
@@ -213,32 +242,29 @@
                     let p = this.list[i];
                     p.x -= this.dx;
                     
-                    // Collision Detection
+                    // Collision
                     if (teary.x + teary.width/2 > p.x && 
                         teary.x - teary.width/2 < p.x + this.width) {
-                            // Hits Top Pipe OR Hits Bottom Pipe
                             if (teary.y - teary.height/2 < p.top || 
                                 teary.y + teary.height/2 > canvas.height - p.bottom) {
                                 gameOver();
                             }
                     }
                     
-                    // Score Update
+                    // Score
                     if (p.x + this.width < teary.x && !p.passed) {
                         score++;
                         document.getElementById('score-display').innerText = score;
                         p.passed = true;
                         
-                        // Haptic feedback on Telegram
                         if(tg.HapticFeedback) {
-                            tg.HapticFeedback.impactOccurred('light');
+                            tg.HapticFeedback.impactOccurred('medium');
                         }
                     }
                     
-                    // Remove off-screen pipes
                     if (p.x + this.width <= 0) {
                         this.list.shift();
-                        i--; // Adjust index since we removed an element
+                        i--;
                     }
                 }
             },
@@ -248,54 +274,42 @@
             }
         };
 
-        // --- INPUT HANDLING ---
-        window.addEventListener('keydown', function(e) {
-            if (e.code === 'Space') {
-                if(gameRunning) teary.flap();
-            }
-        });
-
-        window.addEventListener('touchstart', function(e) {
+        // --- INPUT ---
+        function handleInput(e) {
+            if(e.type === 'keydown' && e.code !== 'Space') return;
+            if(e.type === 'touchstart') e.preventDefault();
+            
             if(gameRunning) {
                 teary.flap();
-                e.preventDefault(); // Prevent scrolling
             }
-        }, {passive: false});
-        
-        // Also support mouse click for desktop testing
-        window.addEventListener('mousedown', function(e) {
-             if(gameRunning) teary.flap();
-        });
+        }
 
-        // --- MAIN LOOP ---
+        window.addEventListener('keydown', handleInput);
+        window.addEventListener('touchstart', handleInput, {passive: false});
+        window.addEventListener('mousedown', handleInput);
+
+        // --- LOOP ---
         function loop() {
-            // Clear Canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Update and Draw
-            teary.draw();
             teary.update();
-            
-            obstacles.draw();
+            teary.draw();
             obstacles.update();
-            
+            obstacles.draw();
             frames++;
-            
             if(gameRunning) {
                 animationId = requestAnimationFrame(loop);
             }
         }
 
-        // --- GAME STATE FUNCTIONS ---
+        // --- STATE ---
         function startGame() {
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('score-display').innerText = '0';
             
-            // Reset variables
             score = 0;
             frames = 0;
-            teary.y = 150;
+            teary.y = canvas.height / 2;
             teary.velocity = 0;
             obstacles.reset();
             
@@ -307,7 +321,6 @@
             gameRunning = false;
             cancelAnimationFrame(animationId);
             
-            // Haptic feedback for Game Over
             if(tg.HapticFeedback) {
                 tg.HapticFeedback.notificationOccurred('error');
             }
@@ -319,13 +332,6 @@
         function resetGame() {
             startGame();
         }
-
-        // Handle resizing
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-
     </script>
 </body>
 </html>
